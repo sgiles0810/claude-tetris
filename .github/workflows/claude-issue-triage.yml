@@ -55,6 +55,10 @@ jobs:
                  index.html y/o style.css), según la arquitectura de CLAUDE.md.
                - Un enfoque sugerido para implementar la solución (sin escribir
                  el código todavía — esto es solo diagnóstico).
+               El comentario debe estar escrito en formato Markdown válido que
+               GitHub pueda renderizar correctamente (encabezados, listas,
+               bloques de código con ``` para fragmentos de código o nombres
+               de archivo, negritas, etc.).
 
             Si este workflow corre de nuevo porque el issue fue editado, publica
             un nuevo comentario de diagnóstico actualizado y ajusta las labels
