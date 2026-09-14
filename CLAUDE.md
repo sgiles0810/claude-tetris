@@ -22,7 +22,7 @@ There is no build, lint, or test tooling in this repo — there is nothing to co
 
 Everything lives in three files with a direct 1:1 mapping:
 
-- `index.html` — DOM structure: the main `<canvas id="board">` (300×600, 10×20 grid of 30px blocks), a `<canvas id="next-canvas">` for the preview piece, the score/lines/level panel, and the pause/game-over overlay.
+- `index.html` — DOM structure: the main `<canvas id="board">` (300×600, 10×20 grid of 30px blocks), a `<canvas id="next-canvas">` for the preview piece, the score/lines/level panel, the game-over overlay (`#overlay`), and the separate pause menu (`#pause-menu`).
 - `style.css` — dark/retro arcade visual theme.
 - `game.js` — all game logic, structured around:
   - **Board model**: a `ROWS × COLS` matrix where each cell is `0` (empty) or a color index `1–7` identifying which piece type occupies it.
@@ -31,8 +31,9 @@ Everything lives in three files with a direct 1:1 mapping:
   - **Game loop** (`loop`): driven by `requestAnimationFrame`, accumulates elapsed time and drops the current piece one row once `dropInterval` is exceeded.
   - **Line clearing** (`clearLines`): scans bottom-up, splices out full rows and unshifts empty ones at the top.
   - **Scoring**: classic table `LINE_SCORES = [0, 100, 300, 500, 800]` multiplied by `level`; hard drop adds 2 pts/cell dropped, soft drop adds 1 pt/row.
-  - **Leveling/speed**: level increases every 10 lines; `dropInterval = max(100, 1000 - (level - 1) * 90)` ms.
+  - **Leveling/speed**: `level = startingLevel + Math.floor(lines / 10)`; `dropInterval = max(100, 1000 - (level - 1) * 90)` ms. `startingLevel` comes from the pause menu's "Nivel inicial" selector, persisted in `localStorage` (`STARTING_LEVEL_STORAGE_KEY`) and applied by `init()`.
   - **Ghost piece** (`ghostY`): projects where the current piece would land and renders it at `globalAlpha = 0.2`.
+  - **Pause menu** (`#pause-menu`, separate from the game-over `#overlay`): `togglePause()`/`showPauseMenu()` toggle it on `P` or `Escape`. It has two sub-sections toggled via `.hidden` — `#pause-main` (Reanudar / Reiniciar / Ver controles / Nivel inicial select) and `#pause-controls` (the key list, with a "Volver" button back to `#pause-main`). While `paused` is true, the `keydown` handler's early return blocks all game-affecting keys (arrows, `KeyX`, `Space`).
 
 Control flow: `init()` builds the board and starts the loop → `loop()` advances gravity and calls `draw()` each frame → `keydown` handlers move/rotate/drop the piece → `lockPiece()` merges the piece into the board, clears lines, and spawns the next one. If a freshly spawned piece immediately collides, `endGame()` fires and shows the Game Over overlay.
 
