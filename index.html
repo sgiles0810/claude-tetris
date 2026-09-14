@@ -7,7 +7,27 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div class="wrapper">
+  <div id="start-screen">
+    <h1 class="game-title">TETRIS</h1>
+
+    <div class="start-highscores">
+      <h2>Mejores puntuaciones</h2>
+      <div id="start-highscore-table"></div>
+      <div id="start-stats" class="highscore-stats"></div>
+      <div id="reset-records-wrap">
+        <button id="reset-records-btn">Resetear records</button>
+        <div id="reset-confirm" class="hidden">
+          <span>¿Seguro?</span>
+          <button id="reset-confirm-yes">Sí</button>
+          <button id="reset-confirm-no">No</button>
+        </div>
+      </div>
+    </div>
+
+    <button id="play-btn">JUGAR</button>
+  </div>
+
+  <div id="game-wrapper" class="wrapper hidden">
     <div class="header-row">
       <h1 class="game-title">TETRIS</h1>
       <label class="theme-switch" title="Cambiar tema claro/oscuro">
@@ -54,6 +74,11 @@
       <div class="overlay-box">
         <p id="overlay-title">GAME OVER</p>
         <p id="overlay-score"></p>
+        <div id="name-entry" class="hidden">
+          <input id="name-input" type="text" maxlength="12" placeholder="Tu nombre" aria-label="Tu nombre" />
+          <button id="name-submit-btn">Guardar</button>
+        </div>
+        <div id="overlay-highscores" class="hidden"></div>
         <button id="restart-btn">Reiniciar</button>
       </div>
     </div>
