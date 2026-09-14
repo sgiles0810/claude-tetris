@@ -33,6 +33,7 @@ Everything lives in three files with a direct 1:1 mapping:
   - **Scoring**: classic table `LINE_SCORES = [0, 100, 300, 500, 800]` multiplied by `level`; hard drop adds 2 pts/cell dropped, soft drop adds 1 pt/row.
   - **Leveling/speed**: level increases every 10 lines; `dropInterval = max(100, 1000 - (level - 1) * 90)` ms.
   - **Ghost piece** (`ghostY`): projects where the current piece would land and renders it at `globalAlpha = 0.2`.
+  - **Visual skins** (`SKINS` registry): `drawBlock(context, x, y, colorIndex, size, alpha)` delegates to `SKINS[currentSkin].drawBlock`, one function per skin (Retro/Neon/Pastel/Pixel art), each with its own 7-color palette and optional canvas `background` override. Selected via `<select id="skin-select">`, persisted to `localStorage` under `tetris-skin`, independent of the light/dark theme toggle (theme controls page-chrome CSS variables only; skins control canvas block rendering only).
 
 Control flow: `init()` builds the board and starts the loop → `loop()` advances gravity and calls `draw()` each frame → `keydown` handlers move/rotate/drop the piece → `lockPiece()` merges the piece into the board, clears lines, and spawns the next one. If a freshly spawned piece immediately collides, `endGame()` fires and shows the Game Over overlay.
 
