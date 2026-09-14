@@ -40,9 +40,116 @@ const overlayTitle = document.getElementById('overlay-title');
 const overlayScore = document.getElementById('overlay-score');
 const restartBtn = document.getElementById('restart-btn');
 const themeToggle = document.getElementById('theme-toggle');
+const skinSelect = document.getElementById('skin-select');
 
 const THEME_STORAGE_KEY = 'tetris-theme';
 const GRID_COLORS = { dark: '#22222e', light: '#dcdce6' };
+
+// ---- Visual skins ----
+// Each skin owns its own 7-color palette and its own block-drawing function.
+// Skins only affect how canvas blocks are rendered; they are independent of
+// the light/dark theme toggle (which controls page chrome via CSS vars).
+const SKIN_STORAGE_KEY = 'tetris-skin';
+
+const NEON_COLORS = [
+  null,
+  '#00e5ff', // I
+  '#ffea00', // O
+  '#e040fb', // T
+  '#00e676', // S
+  '#ff1744', // Z
+  '#2979ff', // J
+  '#ff9100', // L
+];
+
+const PASTEL_COLORS = [
+  null,
+  '#b8e8ec', // I
+  '#fff3c4', // O
+  '#e0c3e8', // T
+  '#c8e6c9', // S
+  '#f5c6c6', // Z
+  '#c3d9f5', // J
+  '#f8d9b0', // L
+];
+
+const PIXEL_COLORS = COLORS;
+
+// Note: callers (drawBlock dispatcher below) already wrap each of these in
+// ctx.save()/ctx.restore() with globalAlpha pre-set, so skin draw functions
+// below focus purely on shape/color and never need to touch or reset
+// globalAlpha/shadowBlur/shadowColor themselves.
+
+function drawBlockRetro(context, x, y, colorIndex, size) {
+  const color = SKINS.retro.palette[colorIndex];
+  context.fillStyle = color;
+  context.fillRect(x * size + 1, y * size + 1, size - 2, size - 2);
+  // highlight
+  context.fillStyle = 'rgba(255,255,255,0.12)';
+  context.fillRect(x * size + 1, y * size + 1, size - 2, 4);
+}
+
+function drawBlockNeon(context, x, y, colorIndex, size) {
+  const color = SKINS.neon.palette[colorIndex];
+  context.shadowBlur = 15;
+  context.shadowColor = color;
+  context.fillStyle = color;
+  context.fillRect(x * size + 3, y * size + 3, size - 6, size - 6);
+}
+
+function drawBlockPastel(context, x, y, colorIndex, size) {
+  const color = SKINS.pastel.palette[colorIndex];
+  context.fillStyle = color;
+  const px = x * size + 2;
+  const py = y * size + 2;
+  const s = size - 4;
+  const r = Math.min(6, s / 2);
+  context.beginPath();
+  if (typeof context.roundRect === 'function') {
+    context.roundRect(px, py, s, s, r);
+  } else {
+    // manual fallback for older browsers without roundRect support
+    context.moveTo(px + r, py);
+    context.arcTo(px + s, py, px + s, py + s, r);
+    context.arcTo(px + s, py + s, px, py + s, r);
+    context.arcTo(px, py + s, px, py, r);
+    context.arcTo(px, py, px + s, py, r);
+    context.closePath();
+  }
+  context.fill();
+}
+
+function drawBlockPixel(context, x, y, colorIndex, size) {
+  const color = SKINS.pixel.palette[colorIndex];
+  context.fillStyle = color;
+  const px = x * size + 1;
+  const py = y * size + 1;
+  const s = size - 2;
+  context.fillRect(px, py, s, s);
+  // dither texture: a 2x2 checkerboard of lighter/darker sub-rects to fake a pixelated look
+  const cell = s / 2;
+  for (let i = 0; i < 2; i++) {
+    for (let j = 0; j < 2; j++) {
+      context.fillStyle = (i + j) % 2 === 0 ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)';
+      context.fillRect(px + i * cell, py + j * cell, cell, cell);
+    }
+  }
+}
+
+const SKINS = {
+  retro: { palette: COLORS, background: null, drawBlock: drawBlockRetro },
+  neon: { palette: NEON_COLORS, background: '#0a0a14', drawBlock: drawBlockNeon },
+  pastel: { palette: PASTEL_COLORS, background: null, drawBlock: drawBlockPastel },
+  pixel: { palette: PIXEL_COLORS, background: null, drawBlock: drawBlockPixel },
+};
+
+let currentSkin = 'retro';
+
+function applySkin(skin) {
+  currentSkin = SKINS[skin] ? skin : 'retro';
+  if (skinSelect) skinSelect.value = currentSkin;
+  localStorage.setItem(SKIN_STORAGE_KEY, currentSkin);
+}
 
 let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId;
 
@@ -172,14 +279,12 @@ function updateHUD() {
 
 function drawBlock(context, x, y, colorIndex, size, alpha) {
   if (!colorIndex) return;
-  const color = COLORS[colorIndex];
+  // save/restore isolates any per-skin context state (shadowBlur, shadowColor,
+  // globalAlpha, ...) so it can never leak into grid lines or subsequent draws.
+  context.save();
   context.globalAlpha = alpha ?? 1;
-  context.fillStyle = color;
-  context.fillRect(x * size + 1, y * size + 1, size - 2, size - 2);
-  // highlight
-  context.fillStyle = 'rgba(255,255,255,0.12)';
-  context.fillRect(x * size + 1, y * size + 1, size - 2, 4);
-  context.globalAlpha = 1;
+  SKINS[currentSkin].drawBlock(context, x, y, colorIndex, size);
+  context.restore();
 }
 
 function drawGrid() {
@@ -201,6 +306,11 @@ function drawGrid() {
 
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const skinBg = SKINS[currentSkin].background;
+  if (skinBg) {
+    ctx.fillStyle = skinBg;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
   drawGrid();
 
   // board
@@ -224,6 +334,11 @@ function draw() {
 function drawNext() {
   const NB = 30;
   nextCtx.clearRect(0, 0, nextCanvas.width, nextCanvas.height);
+  const skinBg = SKINS[currentSkin].background;
+  if (skinBg) {
+    nextCtx.fillStyle = skinBg;
+    nextCtx.fillRect(0, 0, nextCanvas.width, nextCanvas.height);
+  }
   const shape = next.shape;
   const offX = Math.floor((4 - shape[0].length) / 2);
   const offY = Math.floor((4 - shape.length) / 2);
@@ -291,6 +406,10 @@ function init() {
 }
 
 document.addEventListener('keydown', e => {
+  // let focused form controls (e.g. the skin <select>) handle their own
+  // arrow-key navigation instead of also moving/rotating the piece
+  const activeTag = document.activeElement && document.activeElement.tagName;
+  if (activeTag === 'SELECT' || activeTag === 'INPUT' || activeTag === 'TEXTAREA') return;
   if (e.code === 'KeyP') { togglePause(); return; }
   if (paused || gameOver) return;
   switch (e.code) {
@@ -323,5 +442,15 @@ themeToggle.addEventListener('change', () => {
   drawNext();
 });
 
+if (skinSelect) {
+  skinSelect.addEventListener('change', () => {
+    applySkin(skinSelect.value);
+    draw();
+    drawNext();
+    skinSelect.blur(); // return keyboard focus to the game immediately
+  });
+}
+
 applyTheme(localStorage.getItem(THEME_STORAGE_KEY) || 'dark');
+applySkin(localStorage.getItem(SKIN_STORAGE_KEY) || 'retro');
 init();
